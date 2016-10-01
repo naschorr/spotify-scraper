@@ -13,7 +13,6 @@ from win32api import MapVirtualKey, keybd_event
 
 ## String Literals
 SPOTIFY = "spotify"
-ENUM_WINDOWS = "EnumWindows"
 GET_ART = "shouldGetArt"
 ART_SIDE_LENGTH = "artSideLength"
 ART_WINDOW_OFFSET = "artOffsets"
