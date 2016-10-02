@@ -4,7 +4,6 @@ import re
 import psutil
 import pyscreenshot
 import time
-import sys
 from PIL import Image
 from win32con import SW_SHOWMAXIMIZED
 from win32gui import GetWindowText, EnumWindows, GetForegroundWindow, SetForegroundWindow, ShowWindow, GetWindowRect
@@ -34,6 +33,7 @@ class SpotifyScraper:
 
 	def __init__(self, callback=None, **kwargs):
 		self.windowHandle = None
+		self.callback = callback
 		self.song = None
 		self.artist = None
 		self.art = None
@@ -41,24 +41,13 @@ class SpotifyScraper:
 		self.artSideLength = kwargs[ART_SIDE_LENGTH] if ART_SIDE_LENGTH in kwargs else None
 		self.artOffsets = kwargs[ART_WINDOW_OFFSET] if ART_WINDOW_OFFSET in kwargs else None
 
-		self.stopScraping = threading.Event()
+		self._stopScraping = threading.Event()
 		self._findWindowHandleAttempts = 0
 		self.updateWindowHandle()
 
 		if(callback):
-			songUpdated = threading.Event()
-			songQueue = queue.Queue()
-			threading.Thread(target=self._scraper, args=(songUpdated, self.stopScraping, songQueue)).start()
-			try:
-				while(not self.stopScraping.is_set()):
-					songUpdated.wait()	## Can get stuck waiting if stopScraping is set, but the song has already been updated (for the last time).
-					if(not self.stopScraping.is_set()):
-						callback(songQueue.get())	## Lazy, but this fixes the above issue.
-					songUpdated.clear()
-			except KeyboardInterrupt as ke:
-				print("Keyboard Interrupt detected. Stopping.", ke)
-				self.stopScraping.set()
-			sys.exit()
+			threading.Thread(target=self._scraper, args=(self.callback, self._stopScraping)).start()
+		## Else let the user manually grab the information via properties
 
 	## Getters
 
@@ -90,7 +79,7 @@ class SpotifyScraper:
 
 	@song.setter
 	def song(self, value):
-		self._song = value
+		self._song = str(value)
 
 	@property
 	def artist(self):
@@ -98,7 +87,7 @@ class SpotifyScraper:
 
 	@artist.setter
 	def artist(self, value):
-		self._artist = value
+		self._artist = str(value)
 
 	@property
 	def art(self):
@@ -110,11 +99,15 @@ class SpotifyScraper:
 
 	## Methods
 
+	def stopScraping(self):
+		self._stopScraping.set()
+
+
 	def playSong(self):
-		## Restart the song
-		keybd_event(0xB1, MapVirtualKey(0xB1, 0))
 		## Play the song
 		keybd_event(0xB3, MapVirtualKey(0xB3, 0))
+		## Restart the song
+		keybd_event(0xB1, MapVirtualKey(0xB1, 0))
 
 
 	def updateWindowHandle(self, callback=None):
@@ -143,7 +136,7 @@ class SpotifyScraper:
 				self.updateWindowHandle()
 		except RuntimeError as re:
 			print(re, "Is it currently open and running?")
-			self.stopScraping.set()
+			self.stopScraping()
 
 		if(callback):
 			callback()
@@ -187,23 +180,18 @@ class SpotifyScraper:
 
 					## Callback only when the song has been updated.
 					if(callback):
-						callback()
+						try:
+							callback(self.getSongDataDict())
+						except TypeError as te:
+							print("The callback function '" + callback.__name__ + "' should take at least 1 argument.", te)
+							self.stopScraping()
+
 		except RuntimeError as re:
 			print(re, "Was it closed recently?")
-			self.stopScraping.set()
+			self.stopScraping()
 
 
-	def _scraper(self, songUpdated, stopScraping, songQueue):
-		def updateThread():
-			songQueue.put(self.getSongDataDict())
-			songUpdated.set()
-
-		while(not stopScraping.is_set()):
-			self.updateSongData(updateThread)
+	def _scraper(self, callback, stopScrapingEvent):
+		while(not stopScrapingEvent.is_set()):
+			self.updateSongData(callback)
 			time.sleep(SHORT_WAIT)
-
-		## Send a final songUpdated event to make sure the callback loop in
-		##	__init__ doesn't get stuck waiting for an event that'll never come.
-		##	The extra songUpdated.is_set() in that loop will make sure no extra
-		##	callbacks happen because of this.
-		songUpdated.set()
