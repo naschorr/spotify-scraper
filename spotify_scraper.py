@@ -9,6 +9,7 @@ from win32con import SW_SHOWMAXIMIZED
 from win32gui import GetWindowText, EnumWindows, GetForegroundWindow, SetForegroundWindow, ShowWindow, GetWindowRect
 from win32process import GetWindowThreadProcessId
 from win32api import MapVirtualKey, keybd_event
+from inspect import getargspec
 
 ## String Literals
 SPOTIFY = "spotify"
@@ -37,15 +38,17 @@ class SpotifyScraper:
 		self.song = None
 		self.artist = None
 		self.art = None
+
 		self.shouldGetArt = kwargs[GET_ART] if GET_ART in kwargs else False
 		self.artSideLength = kwargs[ART_SIDE_LENGTH] if ART_SIDE_LENGTH in kwargs else None
 		self.artOffsets = kwargs[ART_WINDOW_OFFSET] if ART_WINDOW_OFFSET in kwargs else None
 
+		self._callbackArgCount = len(getargspec(self.callback).args)
 		self._stopScraping = threading.Event()
 		self._findWindowHandleAttempts = 0
 		self.updateWindowHandle()
 
-		if(callback):
+		if(self.callback):
 			threading.Thread(target=self._scraper, args=(self.callback, self._stopScraping)).start()
 		## Else let the user manually grab the information via properties
 
@@ -135,7 +138,7 @@ class SpotifyScraper:
 				time.sleep(WAIT_TIME)	## Give Spotify a moment to start playing.
 				self.updateWindowHandle()
 		except RuntimeError as re:
-			print(re, "Is it currently open and running?")
+			print(re, "Is it currently open and running (and not playing any ads)?")
 			self.stopScraping()
 
 		if(callback):
@@ -160,14 +163,15 @@ class SpotifyScraper:
 
 	def updateSongData(self, callback=None):
 		try:
-			isNewSong = False
 			windowText = GetWindowText(self.windowHandle)
 			## Don't just endlessly loop if the window handle stops working
 			##	(usually because the window was closed).
 			if(not windowText):
 				self.windowHandle = None
 				raise RuntimeError("No valid " + SPOTIFY + " windows available.")
+
 			songMatch = SONG_DATA_RE.match(windowText)
+			## Check to see that the 'Artist - Song' string is in the window's title.
 			if(songMatch):
 				song = songMatch.group(1)
 				artist = songMatch.group(2)
@@ -180,10 +184,13 @@ class SpotifyScraper:
 
 					## Callback only when the song has been updated.
 					if(callback):
-						try:
+						if(self._callbackArgCount == 0):
+							callback()
+						elif(self._callbackArgCount == 1):
 							callback(self.getSongDataDict())
-						except TypeError as te:
-							print("The callback function '" + callback.__name__ + "' should take at least 1 argument.", te)
+						else:
+							alert = "The callback function '{0}' should take 0 or 1 arguments. It current takes {1} arguments."
+							print(alert.format(callback.__name__, self._callbackArgCount))
 							self.stopScraping()
 
 		except RuntimeError as re:
