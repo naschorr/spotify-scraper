@@ -4,8 +4,9 @@ from win32api import MapVirtualKey, keybd_event
 from spotify_scraper import SpotifyScraper
 
 
-## Looks at the randomness of Spotify's shuffle feature.
-class SongFreq:
+## Looks at the randomness of Spotify's shuffle feature. 
+## 	(Except, now the callback doesn't take any arguments.)
+class AltSongFreq:
 	def __init__(self, limit=1000, waitTime=1, **scraperArgs):
 		self.songs = {}
 		self.limit = limit
@@ -20,9 +21,9 @@ class SongFreq:
 			print(key + ' = ' + str(self.songs[key]))
 
 
-	def addSong(self, songDict):
+	def addSong(self):
 		if(self.counter < self.limit):
-			song = songDict["artist"] + ' - ' + songDict["song"]
+			song = self.scraper.song + ' - ' + self.scraper.artist
 			if(song in self.songs):
 				self.songs[song] += 1
 			else:
@@ -45,6 +46,6 @@ class SongFreq:
 
 
 def main():
-	SongFreq(shouldGetArt=False)
+	AltSongFreq(shouldGetArt=False)
 
 main()
