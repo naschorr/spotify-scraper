@@ -19,6 +19,7 @@ ART_WINDOW_OFFSET = "artOffsets"
 SONG = "song"
 ARTIST = "artist"
 ART = "art"
+SELF = "self"
 
 ## Configs
 WAIT_TIME = 1
@@ -44,6 +45,8 @@ class SpotifyScraper:
 		self.artOffsets = kwargs[ART_WINDOW_OFFSET] if ART_WINDOW_OFFSET in kwargs else None
 
 		self._callbackArgCount = len(getargspec(self.callback).args)
+		if(SELF in getargspec(self.callback).args):
+			self._callbackArgCount -= 1
 		self._stopScraping = threading.Event()
 		self._findWindowHandleAttempts = 0
 		self.updateWindowHandle()
