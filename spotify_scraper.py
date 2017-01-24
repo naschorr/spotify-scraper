@@ -19,17 +19,15 @@ ART_WINDOW_OFFSET = "artOffsets"
 SONG = "song"
 ARTIST = "artist"
 ART = "art"
-SELF = "self"
 
 ## Configs
 WAIT_TIME = 1
 ATTEMPT_LIMIT = 5
 SHORT_WAIT = 0.001
 SONG_DATA_RE = re.compile(r'(.+) - (.+)')
-
 ## Define capture regions and offsets (These should play nice with 1080p screens)
 ALBUM_ART_SIZE = 400			# 400px^2
-ALBUM_ART_OFFSET = (8, 119)		# (Offset from left side of window, Offset from bottom of window)
+ALBUM_ART_OFFSET = (8, 96)		# (Offset from left side of window, Offset from bottom of window)
 
 class SpotifyScraper:
 
@@ -41,11 +39,11 @@ class SpotifyScraper:
 		self.art = None
 
 		self.shouldGetArt = kwargs[GET_ART] if GET_ART in kwargs else False
-		self.artSideLength = kwargs[ART_SIDE_LENGTH] if ART_SIDE_LENGTH in kwargs else None
-		self.artOffsets = kwargs[ART_WINDOW_OFFSET] if ART_WINDOW_OFFSET in kwargs else None
+		self.artSideLength = kwargs[ART_SIDE_LENGTH] if ART_SIDE_LENGTH in kwargs else ALBUM_ART_SIZE
+		self.artOffsets = kwargs[ART_WINDOW_OFFSET] if ART_WINDOW_OFFSET in kwargs else ALBUM_ART_OFFSET
 
 		self._callbackArgCount = len(getargspec(self.callback).args)
-		if(SELF in getargspec(self.callback).args):
+		if("self" in getargspec(self.callback).args):
 			self._callbackArgCount -= 1
 		self._stopScraping = threading.Event()
 		self._findWindowHandleAttempts = 0
@@ -53,7 +51,7 @@ class SpotifyScraper:
 
 		if(self.callback):
 			threading.Thread(target=self._scraper, args=(self.callback, self._stopScraping)).start()
-		## Else let the user manually grab the information via properties
+		## Else let the user manually grab the information via properties and call updateSongData()
 
 	## Getters
 
