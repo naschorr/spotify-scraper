@@ -1,5 +1,4 @@
 import threading
-import queue
 import re
 import psutil
 import pyscreenshot
@@ -130,17 +129,14 @@ class SpotifyScraper:
 
 		## Can't know which window will display the currently playing song
 		## 	information unless it's playing music.
-		try:
-			if(not self.windowHandle):
-				self._findWindowHandleAttempts += 1
-				if(self._findWindowHandleAttempts > ATTEMPT_LIMIT):
-					raise RuntimeError("No valid " + SPOTIFY + " windows available.")
-				self.playSong()
-				time.sleep(WAIT_TIME)	## Give Spotify a moment to start playing.
-				self.updateWindowHandle()
-		except RuntimeError as re:
-			print(re, "Is it currently open and running (and not playing any ads)?")
-			self.stopScraping()
+		if(not self.windowHandle):
+			self._findWindowHandleAttempts += 1
+			if(self._findWindowHandleAttempts > ATTEMPT_LIMIT):
+				self.stopScraping()
+				raise RuntimeError("No valid " + SPOTIFY + " windows available. Is it currently open and running (and not playing any ads)?")
+			self.playSong()
+			time.sleep(WAIT_TIME)	## Give Spotify a moment to start playing.
+			self.updateWindowHandle()
 
 		if(callback):
 			callback()
@@ -163,40 +159,36 @@ class SpotifyScraper:
 
 
 	def updateSongData(self, callback=None):
-		try:
-			windowText = GetWindowText(self.windowHandle)
-			## Don't just endlessly loop if the window handle stops working
-			##	(usually because the window was closed).
-			if(not windowText):
-				self.windowHandle = None
-				raise RuntimeError("No valid " + SPOTIFY + " windows available.")
-
-			songMatch = SONG_DATA_RE.match(windowText)
-			## Check to see that the 'Artist - Song' string is in the window's title.
-			if(songMatch):
-				song = songMatch.group(1)
-				artist = songMatch.group(2)
-				## Check to make sure that the song data is for a new song.
-				if(self.song != song or self.artist != artist):
-					self.song = song
-					self.artist = artist
-					if(self.shouldGetArt):
-						self.art = self.captureAlbumArt()
-
-					## Callback only when the song has been updated.
-					if(callback):
-						if(self._callbackArgCount == 0):
-							callback()
-						elif(self._callbackArgCount == 1):
-							callback(self.getSongDataDict())
-						else:
-							alert = "The callback function '{0}' should take 0 or 1 arguments. It current takes {1} arguments."
-							print(alert.format(callback.__name__, self._callbackArgCount))
-							self.stopScraping()
-
-		except RuntimeError as re:
-			print(re, "Was it closed recently?")
+		windowText = GetWindowText(self.windowHandle)
+		## Don't just endlessly loop if the window handle stops working
+		##	(usually because the window was closed).
+		if(not windowText):
 			self.stopScraping()
+			self.windowHandle = None
+			raise RuntimeError("No valid " + SPOTIFY + " windows available. Was it closed recently?")
+
+		songMatch = SONG_DATA_RE.match(windowText)
+		## Check to see that the 'Artist - Song' string is in the window's title.
+		if(songMatch):
+			song = songMatch.group(1)
+			artist = songMatch.group(2)
+			## Check to make sure that the song data is for a new song.
+			if(self.song != song or self.artist != artist):
+				self.song = song
+				self.artist = artist
+				if(self.shouldGetArt):
+					self.art = self.captureAlbumArt()
+
+				## Callback only when the song has been updated.
+				if(callback):
+					if(self._callbackArgCount == 0):
+						callback()
+					elif(self._callbackArgCount == 1):
+						callback(self.getSongDataDict())
+					else:
+						self.stopScraping()
+						alert = "The callback function '{0}' should take 0 or 1 arguments. It current takes {1} arguments."
+						RuntimeError(alert.format(callback.__name__, self._callbackArgCount))
 
 
 	def _scraper(self, callback, stopScrapingEvent):
